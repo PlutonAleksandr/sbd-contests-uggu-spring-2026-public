@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "allows": [],
+  "_note": "Минимальная заготовка: см. references/secure_ipc и docs/schemas/ipc_policies.schema.json при введении ДВБ tcb/other и монитора."
+}

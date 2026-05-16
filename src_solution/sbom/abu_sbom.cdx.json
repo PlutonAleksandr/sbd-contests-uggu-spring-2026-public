@@ -1,0 +1,50 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:8a7b6c5d-4e3f-2a1b-9c8d-7e6f5a4b3c2d",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-03-24T00:00:00Z",
+    "component": {
+      "type": "application",
+      "name": "abu-starting-point",
+      "version": "0.1.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "fastapi",
+      "version": "0.115.0",
+      "bom-ref": "pkg:pypi/fastapi@0.115.0"
+    },
+    {
+      "type": "library",
+      "name": "uvicorn",
+      "version": "0.32.0",
+      "bom-ref": "pkg:pypi/uvicorn@0.32.0"
+    },
+    {
+      "type": "library",
+      "name": "pydantic",
+      "version": "2.10.0",
+      "bom-ref": "pkg:pypi/pydantic@2.10.0"
+    },
+    {
+      "type": "application",
+      "name": "abu-controller",
+      "version": "0.1.0",
+      "description": "Прототип контроллера АБУ (вся поставка считается ДВБ при отсутствии явного разбиения)"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:pypi/fastapi@0.115.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/uvicorn@0.32.0",
+      "dependsOn": []
+    }
+  ]
+}
