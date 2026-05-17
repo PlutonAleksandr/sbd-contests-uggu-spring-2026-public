@@ -2,4 +2,5 @@
 
 from .event_log import EventLog, EventLevel, default_log
 from .safety import enforce_depth_cap, enforce_rpm_cap, should_emergency_stop
-from .guard import TCBGuard, guard, authorize_step, DrillingStep, AuthorizationResult
+from .guard import SecurityMonitor, security_monitor, authorize_step
+from .datatypes import SecureStep

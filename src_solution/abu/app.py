@@ -9,16 +9,21 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from abu.other.validation_worker import StepValidator
+from abu.tcb.guard import authorize_step
 from abu.tcb.event_log import EventLevel, default_log
+
 from abu.other.numpy_workflow import smooth_vibration_window
 from abu.other.pseudo_ai import anomaly_vibration, regime_suggest, risk_flag
 from abu.tcb.safety import (
     enforce_depth_cap,
     enforce_rpm_cap,
-    should_emergency_stop,
 )
 
 app = FastAPI(title="АБУ (прототип)", version="0.1.0")
+
+# Экземпляр валидатора (пока не используется в tick, но готов для будущего API)
+validator = StepValidator()
 
 
 class MissionIn(BaseModel):
@@ -118,6 +123,7 @@ def current_mission() -> dict[str, Any]:
 def tick_step() -> dict[str, Any]:
     """
     Один шаг симуляции (для демо и тестов): увеличивает глубину и обновляет сенсоры.
+    Критические проверки безопасности теперь проходят через authorize_step().
     """
     global _mission
     if _mission is None:
@@ -125,6 +131,8 @@ def tick_step() -> dict[str, Any]:
     m = _mission
     if m.status != "running":
         return {"done": True, "status": m.status}
+
+    # Симуляция шага
     m.depth_m = round(min(m.depth_m + 0.5, m.target_depth_m), 2)
     m.vibration_samples.append(0.1 + 0.05 * (m.depth_m % 3))
     _smooth = smooth_vibration_window(m.vibration_samples)
@@ -134,35 +142,57 @@ def tick_step() -> dict[str, Any]:
     )
     m.torque_nm = 2000 + m.depth_m * 30
     m.pressure = 120 + m.depth_m * 0.4
+
+    # Расчёт RPM
     rpm_suggest, _feed = regime_suggest(m.depth_m, m.torque_nm)
     try:
         cap = float(os.environ.get("ABU_MAX_RPM", "300"))
     except ValueError:
         cap = 300.0
     m.rpm = min(rpm_suggest, cap)
+
+    # Оценка риска для передачи в ДВБ
     risk = risk_flag(
         anomaly_vibration(m.vibration_samples),
         m.pressure,
         m.depth_m,
     )
-    if risk == "high":
-        default_log.record(
-            EventLevel.WARNING,
-            f"risk_high depth_m={m.depth_m:.2f} rpm={m.rpm:.1f}",
-        )
-    if not enforce_depth_cap(m.depth_m, m.target_depth_m + 1e-6):
-        m.status = "stopped_depth"
-        default_log.record(EventLevel.WARNING, "mission_stopped_depth_cap")
-    if not enforce_rpm_cap(m.rpm, float(os.environ.get("ABU_MAX_RPM", "400"))):
-        m.status = "stopped_rpm"
-        default_log.record(EventLevel.ERROR, "mission_stopped_rpm_cap")
-    if should_emergency_stop(risk, m.vibration_samples):
+
+    # Подготовка данных для авторизации (SecureStep)
+    step_data = {
+        "depth": m.depth_m,
+        "rpm": int(m.rpm),
+        "pressure": m.pressure,
+        "step_id": m.mission_id,          # используем mission_id как идентификатор шага
+        "operator_id": "auto",
+        "timestamp": 0.0,                 # в реальном коде нужно актуальное время
+        "risk_level": risk,
+        "vib_sample": anomaly_vibration(m.vibration_samples) if m.vibration_samples else 0.0,
+    }
+
+    # Централизованная проверка через ДВБ
+    auth = authorize_step(step_data)
+
+    # Реакция на результат
+    if auth["emergency"] or not auth["authorized"]:
         m.status = "emergency"
-        default_log.record(EventLevel.CRITICAL, "emergency_stop_triggered")
-    if m.depth_m >= m.target_depth_m:
-        m.status = "completed"
-        default_log.record(EventLevel.INFO, "mission_completed_target_depth")
-    return {"mission": m.model_dump(), "risk": risk}
+        default_log.record(
+            EventLevel.CRITICAL,
+            f"authorize_step denied: {auth['reason']}",
+        )
+    else:
+        # Дополнительные локальные проверки (лёгкие, не противоречат ДВБ)
+        if not enforce_depth_cap(m.depth_m, m.target_depth_m + 1e-6):
+            m.status = "stopped_depth"
+            default_log.record(EventLevel.WARNING, "mission_stopped_depth_cap")
+        if not enforce_rpm_cap(m.rpm, float(os.environ.get("ABU_MAX_RPM", "400"))):
+            m.status = "stopped_rpm"
+            default_log.record(EventLevel.ERROR, "mission_stopped_rpm_cap")
+        if m.depth_m >= m.target_depth_m:
+            m.status = "completed"
+            default_log.record(EventLevel.INFO, "mission_completed_target_depth")
+
+    return {"mission": m.model_dump(), "risk": risk, "auth": auth}
 
 
 class AISuggestIn(BaseModel):
