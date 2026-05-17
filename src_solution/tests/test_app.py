@@ -5,7 +5,7 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
-from abu.app import app
+from src_solution.abu.app import app
 
 
 @pytest.fixture()
@@ -50,7 +50,7 @@ def test_ai_suggest(client: TestClient) -> None:
 
 def test_tick_without_mission(client: TestClient) -> None:
     """Тик без миссии — ошибка."""
-    import abu.app as app_mod
+    import src_solution.abu.app as app_mod
 
     app_mod._mission = None
     r = client.post("/api/v1/missions/tick")

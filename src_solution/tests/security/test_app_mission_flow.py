@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from abu.app import app
+from src_solution.abu.app import app
 
 
 @pytest.mark.security

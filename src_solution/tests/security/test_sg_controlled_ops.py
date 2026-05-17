@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from abu.other.pseudo_ai import anomaly_vibration, risk_flag
-from abu.tcb.safety import should_emergency_stop
+from src_solution.abu.other.pseudo_ai import anomaly_vibration, risk_flag
+from src_solution.abu.tcb.safety import should_emergency_stop
 
 
 @pytest.mark.security

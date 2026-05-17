@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from abu.tcb.event_log import EventLevel, EventLog
-from abu.other.numpy_workflow import smooth_vibration_window
+from src_solution.abu.tcb.event_log import EventLevel, EventLog
+from src_solution.abu.other.numpy_workflow import smooth_vibration_window
 
 
 @pytest.mark.security

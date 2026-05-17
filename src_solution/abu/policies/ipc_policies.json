@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "description": "Политики IPC между доменами",
+  "policies": [
+    {
+      "source": "tcb.security_monitor",
+      "target": "other.other_worker",
+      "commands": ["compute", "health"],
+      "default": "deny"
+    },
+    {
+      "source": "other.other_worker",
+      "target": "tcb.security_monitor",
+      "commands": [],
+      "default": "deny"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 """Предварительная валидация и подготовка данных (недоверенный код)."""
 
 from typing import Dict, Any, Optional
-from abu.tcb.datatypes import SecureStep
+from src_solution.abu.tcb.datatypes import SecureStep
 
 
 class StepValidator:

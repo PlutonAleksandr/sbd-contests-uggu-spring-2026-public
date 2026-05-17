@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from abu.app import app
-from abu.tcb.safety import enforce_depth_cap, enforce_rpm_cap
+from src_solution.abu.app import app
+from src_solution.abu.tcb.safety import enforce_depth_cap, enforce_rpm_cap
 
 
 @pytest.mark.security

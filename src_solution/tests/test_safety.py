@@ -1,7 +1,7 @@
 """Тесты проверок безопасности."""
 
-from abu.other.pseudo_ai import RiskLevel
-from abu.tcb.safety import (
+from src_solution.abu.other.pseudo_ai import RiskLevel
+from src_solution.abu.tcb.safety import (
     enforce_depth_cap,
     enforce_rpm_cap,
     should_emergency_stop,

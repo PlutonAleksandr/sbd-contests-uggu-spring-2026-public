@@ -10,9 +10,9 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from abu.tcb.event_log import EventLog, EventLevel
-from abu.tcb.security_monitor import SecurityMonitorProcess
-from abu.other.other_worker import OtherWorkerProcess
+from src_solution.abu.tcb.event_log import EventLog, EventLevel
+from src_solution.abu.tcb.security_monitor import SecurityMonitorProcess
+from src_solution.abu.other.other_worker import OtherWorkerProcess
 
 # Очереди для IPC
 tcb_request_queue = multiprocessing.Queue()

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abu.tcb.event_log import EventLevel, EventLog
+from src_solution.abu.tcb.event_log import EventLevel, EventLog
 
 
 def test_ring_maxlen(tmp_path) -> None:
