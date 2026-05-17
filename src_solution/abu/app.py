@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from src_solution.abu.tcb.event_log import EventLog, EventLevel
-from src_solution.abu.tcb.security_monitor import SecurityMonitorProcess
+from src_solution.abu.tcb.sys.security_monitor import SecurityMonitorProcess
 from src_solution.abu.other.other_worker import OtherWorkerProcess
 
 # Очереди для IPC
@@ -20,12 +20,9 @@ tcb_response_queue = multiprocessing.Queue()
 other_request_queue = multiprocessing.Queue()
 other_response_queue = multiprocessing.Queue()
 
-# Процессы (None, пока не запущены)
+# Глобальные процессы (инициализируются в startup)
 tcb_process = None
 other_process = None
-
-# Флаги режима (процессы запущены?)
-_processes_started = False
 
 app = FastAPI(title="АБУ (прототип)", version="0.1.0")
 default_log = EventLog()
@@ -51,47 +48,36 @@ class MissionState(BaseModel):
 
 _mission: MissionState | None = None
 
-# -- Обработчики для fallback-режима (прямые вызовы) --
-_tcb_monitor = SecurityMonitorProcess(tcb_request_queue, tcb_response_queue)
-_other_worker = OtherWorkerProcess(other_request_queue, other_response_queue)
-
 
 def _start_processes():
     """Запуск дочерних процессов (только если ещё не запущены)."""
-    global tcb_process, other_process, _processes_started
-    if _processes_started:
+    global tcb_process, other_process
+    if tcb_process is not None and tcb_process.is_alive():
         return
     tcb_process = multiprocessing.Process(
-        target=SecurityMonitorProcess.start, args=(_tcb_monitor,),
+        target=SecurityMonitorProcess.start_static,
+        args=(tcb_request_queue, tcb_response_queue),
         name="tcb-process"
     )
     other_process = multiprocessing.Process(
-        target=OtherWorkerProcess.start, args=(_other_worker,),
+        target=OtherWorkerProcess.start_static,
+        args=(other_request_queue, other_response_queue),
         name="other-process"
     )
     tcb_process.start()
     other_process.start()
-    _processes_started = True
 
 
 def _send_tcb(command: str, payload: dict = None) -> dict:
-    """Отправить запрос в TCB: если процессы запущены — через IPC, иначе напрямую."""
-    if _processes_started:
-        tcb_request_queue.put({"command": command, "payload": payload or {}})
-        return tcb_response_queue.get(timeout=5.0)
-    else:
-        # Fallback: прямой вызов
-        return _tcb_monitor.handle({"command": command, "payload": payload or {}})
+    """Отправить запрос в TCB через IPC."""
+    tcb_request_queue.put({"command": command, "payload": payload or {}})
+    return tcb_response_queue.get(timeout=5.0)
 
 
 def _send_other(command: str, payload: dict = None) -> dict:
-    """Отправить запрос в Other: если процессы запущены — через IPC, иначе напрямую."""
-    if _processes_started:
-        other_request_queue.put({"command": command, "payload": payload or {}})
-        return other_response_queue.get(timeout=5.0)
-    else:
-        # Fallback: прямой вызов
-        return _other_worker.handle({"command": command, "payload": payload or {}})
+    """Отправить запрос в Other через IPC."""
+    other_request_queue.put({"command": command, "payload": payload or {}})
+    return other_response_queue.get(timeout=5.0)
 
 
 @app.on_event("startup")
@@ -103,8 +89,6 @@ def startup():
 @app.on_event("shutdown")
 def shutdown():
     """Остановка процессов."""
-    if not _processes_started:
-        return
     tcb_request_queue.put({"command": "shutdown"})
     other_request_queue.put({"command": "shutdown"})
     if tcb_process and tcb_process.is_alive():
@@ -237,11 +221,16 @@ def tick_step() -> dict[str, Any]:
 
     if auth["emergency"] or not auth["authorized"]:
         m.status = "emergency"
-        default_log.record(EventLevel.CRITICAL, f"authorize_step denied: {auth['reason']}")
+        default_log.record(
+            EventLevel.CRITICAL,
+            f"authorize_step denied: {
+                auth['reason']}")
     else:
         if m.depth_m >= m.target_depth_m:
             m.status = "completed"
-            default_log.record(EventLevel.INFO, "mission_completed_target_depth")
+            default_log.record(
+                EventLevel.INFO,
+                "mission_completed_target_depth")
 
     return {"mission": m.model_dump(), "risk": risk, "auth": auth}
 

@@ -22,8 +22,8 @@ class OtherWorkerProcess:
         request_queue: multiprocessing.Queue,
         response_queue: multiprocessing.Queue,
     ):
-        self.request_queue = request_queue
-        self.response_queue = response_queue
+        self.req = request_queue
+        self.resp = response_queue
         self.validator = StepValidator()
         self._running = False
 
@@ -34,14 +34,20 @@ class OtherWorkerProcess:
 
         while self._running:
             try:
-                msg = self.request_queue.get(timeout=0.1)
+                msg = self.req.get(timeout=0.1)
                 if msg is None or msg.get("command") == "shutdown":
                     self._running = False
                     break
                 response = self.handle(msg)
-                self.response_queue.put(response)
+                self.resp.put(response)
             except Exception:
                 continue
+
+    @staticmethod
+    def start_static(req_q, resp_q):
+        """Точка входа для multiprocessing.Process."""
+        worker = OtherWorkerProcess(req_q, resp_q)
+        worker.start()
 
     def handle(self, msg: dict) -> dict:
         """Обработка входящей команды."""
@@ -84,9 +90,3 @@ class OtherWorkerProcess:
             "suggested_feed": feed,
             "risk": risk,
         }
-
-
-def run_other_worker(request_queue, response_queue):
-    """Точка входа для multiprocessing.Process."""
-    worker = OtherWorkerProcess(request_queue, response_queue)
-    worker.start()

@@ -14,12 +14,19 @@ class StepValidator:
         self.max_rpm = max_rpm
         self.max_pressure = max_pressure
 
-    def validate_and_prepare(self, raw: Dict[str, Any]) -> Optional[SecureStep]:
+    def validate_and_prepare(
+            self, raw: Dict[str, Any]) -> Optional[SecureStep]:
         """
         Возвращает SecureStep, если данные корректны, иначе None.
         """
         # Проверка наличия полей
-        required = {'depth', 'rpm', 'pressure', 'step_id', 'operator_id', 'timestamp'}
+        required = {
+            'depth',
+            'rpm',
+            'pressure',
+            'step_id',
+            'operator_id',
+            'timestamp'}
         if not required.issubset(raw.keys()):
             return None
 
@@ -39,7 +46,8 @@ class StepValidator:
         if not step_id.strip() or not operator_id.strip():
             return None
 
-        # Расчёт уровня риска (эвристика, покрывается предположением о благонадёжности)
+        # Расчёт уровня риска (эвристика, покрывается предположением о
+        # благонадёжности)
         risk_level = self._compute_risk(depth, rpm, pressure)
         vib_sample = abs(rpm - 300) / 300  # пример нормализации
 
@@ -58,10 +66,10 @@ class StepValidator:
         """Эвристика уровня риска."""
         if (depth > self.max_depth * 0.9 or
             pressure > self.max_pressure * 0.9 or
-            rpm > self.max_rpm * 0.9):
+                rpm > self.max_rpm * 0.9):
             return "high"
         if (depth > self.max_depth * 0.7 or
             pressure > self.max_pressure * 0.7 or
-            rpm > self.max_rpm * 0.7):
+                rpm > self.max_rpm * 0.7):
             return "medium"
         return "low"

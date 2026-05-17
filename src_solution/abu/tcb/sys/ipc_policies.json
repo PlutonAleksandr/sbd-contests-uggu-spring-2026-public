@@ -1,11 +1,16 @@
 {
   "version": "1.0",
-  "description": "Политики IPC ДВБ (TCB)",
   "policies": [
+    {
+      "source": "abu.app",
+      "target": "tcb.security_monitor",
+      "commands": ["authorize", "health", "events_ring", "events_full"],
+      "default": "deny"
+    },
     {
       "source": "tcb.security_monitor",
       "target": "other.other_worker",
-      "commands": ["compute", "health"],
+      "commands": [],
       "default": "deny"
     }
   ]

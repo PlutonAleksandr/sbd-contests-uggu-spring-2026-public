@@ -35,11 +35,11 @@ def should_emergency_stop(
     # Проверка высокого риска
     if risk == "high":
         return True
-    
+
     # Проверка аномальной вибрации
     if vib_samples and len(vib_samples) > 0:
         # Простая проверка: если есть значения выше порога
         if max(vib_samples) >= vib_threshold:
             return True
-    
+
     return False

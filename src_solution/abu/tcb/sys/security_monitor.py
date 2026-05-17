@@ -5,9 +5,9 @@ import multiprocessing
 import signal
 from pathlib import Path
 
-from .event_log import EventLog, EventLevel
-from .safety import enforce_depth_cap, enforce_rpm_cap, should_emergency_stop
-from .datatypes import SecureStep
+from src_solution.abu.tcb.event_log import EventLog, EventLevel
+from src_solution.abu.tcb.safety import enforce_depth_cap, enforce_rpm_cap, should_emergency_stop
+from src_solution.abu.tcb.datatypes import SecureStep
 
 
 class SecurityMonitorProcess:
@@ -37,6 +37,11 @@ class SecurityMonitorProcess:
             except Exception:
                 continue
 
+    @staticmethod
+    def start_static(req_q, resp_q):
+        monitor = SecurityMonitorProcess(req_q, resp_q)
+        monitor.start()
+
     def handle(self, msg: dict) -> dict:
         cmd = msg.get("command")
         payload = msg.get("payload", {})
@@ -60,7 +65,9 @@ class SecurityMonitorProcess:
         if should_emergency_stop(step.risk_level, [step.vib_sample]):
             result["reason"] = "Emergency stop triggered"
             result["emergency"] = True
-            self.log.record(EventLevel.CRITICAL, f"Step {step.step_id} emergency stop")
+            self.log.record(
+                EventLevel.CRITICAL, f"Step {
+                    step.step_id} emergency stop")
             return result
         checks = {
             "depth_check": enforce_depth_cap(step.depth, self.max_depth),

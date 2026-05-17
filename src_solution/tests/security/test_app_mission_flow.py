@@ -1,17 +1,12 @@
 """Покрытие app.py и сценариев миссии (безопасность)."""
 
-from __future__ import annotations
-
 import pytest
 from fastapi.testclient import TestClient
 
-from src_solution.abu.app import app
-
 
 @pytest.mark.security
-def test_mission_tick_flow() -> None:
-    """SG: полный цикл миссии с tick и журналом."""
-    c = TestClient(app)
+def test_mission_tick_flow(client: TestClient) -> None:
+    c = client
     c.post("/api/v1/missions", json={"target_depth_m": 4.0, "max_rpm": 250.0})
     for _ in range(12):
         r = c.post("/api/v1/missions/tick")

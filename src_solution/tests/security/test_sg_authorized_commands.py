@@ -21,5 +21,9 @@ def test_depth_rpm_caps_enforced() -> None:
 def test_mission_requires_post_not_get() -> None:
     """Команды миссии только через объявленный API (упрощённая проверка)."""
     c = TestClient(app)
-    r = c.post("/api/v1/missions", json={"target_depth_m": 5.0, "max_rpm": 200.0})
+    r = c.post(
+        "/api/v1/missions",
+        json={
+            "target_depth_m": 5.0,
+            "max_rpm": 200.0})
     assert r.status_code == 200
