@@ -7,6 +7,7 @@ from src_solution.abu.app import (
     tcb_response_queue,
     other_request_queue,
     other_response_queue,
+    _mission
 )
 from src_solution.abu.tcb.sys.security_monitor import SecurityMonitorProcess
 from src_solution.abu.other.other_worker import OtherWorkerProcess
@@ -32,6 +33,13 @@ def processes():
     other_request_queue.put({"command": "shutdown"})
     tcb.join(timeout=2)
     other.join(timeout=2)
+
+
+@pytest.fixture(autouse=True)
+def reset_mission():
+    """Сбрасывать глобальную миссию перед каждым тестом."""
+    import src_solution.abu.app as app_mod
+    app_mod._mission = None
 
 
 @pytest.fixture()

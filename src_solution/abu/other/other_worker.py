@@ -90,3 +90,7 @@ class OtherWorkerProcess:
             "suggested_feed": feed,
             "risk": risk,
         }
+
+    def _handle_direct(self, command: str, payload: dict) -> dict:
+        return self.handle({"command": command, "payload": payload})
+        
