@@ -10,9 +10,9 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from src_solution.abu.tcb.event_log import EventLog, EventLevel
-from src_solution.abu.tcb.sys.security_monitor import SecurityMonitorProcess
-from src_solution.abu.other.other_worker import OtherWorkerProcess
+from abu.tcb.event_log import EventLog, EventLevel
+from abu.tcb.sys.security_monitor import SecurityMonitorProcess
+from abu.other.other_worker import OtherWorkerProcess
 
 # Очереди для IPC
 tcb_request_queue = multiprocessing.Queue()
@@ -23,6 +23,13 @@ other_response_queue = multiprocessing.Queue()
 # Глобальные процессы (инициализируются в startup)
 tcb_process = None
 other_process = None
+
+# Флаг, запущены ли процессы
+_processes_started = False
+
+# Резервные обработчики (fallback, если процессы не запущены)
+_tcb_monitor = SecurityMonitorProcess(tcb_request_queue, tcb_response_queue)
+_other_worker = OtherWorkerProcess(other_request_queue, other_response_queue)
 
 app = FastAPI(title="АБУ (прототип)", version="0.1.0")
 default_log = EventLog()
@@ -50,10 +57,9 @@ _mission: MissionState | None = None
 
 
 def _start_processes():
-    """Запуск дочерних процессов (только если ещё не запущены)."""
-    global tcb_process, other_process
-
-    if tcb_process is not None and tcb_process.is_alive():
+    """Запуск дочерних процессов."""
+    global tcb_process, other_process, _processes_started
+    if _processes_started:
         return
     tcb_process = multiprocessing.Process(
         target=SecurityMonitorProcess.start_static,
@@ -67,28 +73,23 @@ def _start_processes():
     )
     tcb_process.start()
     other_process.start()
-
-
-def _ensure_processes():
-    """Запускает процессы, если ещё не запущены (отложенный старт)."""
-    if (tcb_process is None or not tcb_process.is_alive() or
-            other_process is None or not other_process.is_alive()):
-        _start_processes()
-        # Даём процессам время на инициализацию
-        import time
-        time.sleep(0.2)
+    _processes_started = True
 
 
 def _send_tcb(command: str, payload: dict = None) -> dict:
-    _ensure_processes()
-    tcb_request_queue.put({"command": command, "payload": payload or {}})
-    return tcb_response_queue.get(timeout=5.0)
+    if _processes_started:
+        tcb_request_queue.put({"command": command, "payload": payload or {}})
+        return tcb_response_queue.get(timeout=5.0)
+    else:
+        return _tcb_monitor._handle_direct(command, payload or {})
 
 
 def _send_other(command: str, payload: dict = None) -> dict:
-    _ensure_processes()
-    other_request_queue.put({"command": command, "payload": payload or {}})
-    return other_response_queue.get(timeout=5.0)
+    if _processes_started:
+        other_request_queue.put({"command": command, "payload": payload or {}})
+        return other_response_queue.get(timeout=5.0)
+    else:
+        return _other_worker._handle_direct(command, payload or {})
 
 
 @app.on_event("startup")
@@ -100,12 +101,12 @@ def startup():
 @app.on_event("shutdown")
 def shutdown():
     """Остановка процессов."""
+    if not _processes_started:
+        return
     tcb_request_queue.put({"command": "shutdown"})
     other_request_queue.put({"command": "shutdown"})
-    if tcb_process and tcb_process.is_alive():
-        tcb_process.join(timeout=2)
-    if other_process and other_process.is_alive():
-        other_process.join(timeout=2)
+    tcb_process.join(timeout=2)
+    other_process.join(timeout=2)
 
 
 @app.get("/api/v1/health")
@@ -162,6 +163,7 @@ def status() -> dict[str, Any]:
 @app.post("/api/v1/missions")
 def start_mission(body: MissionIn) -> dict[str, Any]:
     """Принять новое задание."""
+    global _mission
     mid = str(uuid.uuid4())
     _mission = MissionState(
         mission_id=mid,
@@ -186,19 +188,18 @@ def current_mission() -> dict[str, Any]:
 @app.post("/api/v1/missions/tick")
 def tick_step() -> dict[str, Any]:
     """Один шаг симуляции."""
+    global _mission
     if _mission is None:
         raise HTTPException(status_code=400, detail="нет миссии")
     m = _mission
     if m.status != "running":
         return {"done": True, "status": m.status}
 
-    # Симуляция шага
     m.depth_m = round(min(m.depth_m + 0.5, m.target_depth_m), 2)
     m.vibration_samples.append(0.1 + 0.05 * (m.depth_m % 3))
     m.torque_nm = 2000 + m.depth_m * 30
     m.pressure = 120 + m.depth_m * 0.4
 
-    # Вычисления через Other
     comp = _send_other("compute", {
         "vibration_samples": m.vibration_samples,
         "depth_m": m.depth_m,
@@ -228,18 +229,16 @@ def tick_step() -> dict[str, Any]:
 
     auth = _send_tcb("authorize", step_data)
 
-    if auth["emergency"] or not auth["authorized"]:
+    if auth.get("emergency") or not auth.get("authorized"):
         m.status = "emergency"
         default_log.record(
             EventLevel.CRITICAL,
-            f"authorize_step denied: {auth['reason']}"
+            f"authorize_step denied: {auth.get('reason', 'unknown')}"
         )
     else:
         if m.depth_m >= m.target_depth_m:
             m.status = "completed"
-            default_log.record(
-                EventLevel.INFO,
-                "mission_completed_target_depth")
+            default_log.record(EventLevel.INFO, "mission_completed_target_depth")
 
     return {"mission": m.model_dump(), "risk": risk, "auth": auth}
 
@@ -261,3 +260,4 @@ def ai_suggest(body: AISuggestIn) -> dict[str, float]:
         "suggested_rpm": comp.get("suggested_rpm", 150.0),
         "suggested_feed_mm_rev": comp.get("suggested_feed", 0.2),
     }
+    

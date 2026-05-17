@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 
 @pytest.mark.security
-def test_mission_tick_flow(client: TestClient, reset_mission) -> None:
+def test_mission_tick_flow(client: TestClient) -> None:
     c = client
     c.post("/api/v1/missions", json={"target_depth_m": 4.0, "max_rpm": 250.0})
     for _ in range(12):

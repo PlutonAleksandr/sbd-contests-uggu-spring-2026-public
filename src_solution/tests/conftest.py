@@ -1,4 +1,3 @@
-# src_solution/tests/conftest.py
 import multiprocessing
 import pytest
 from fastapi.testclient import TestClient
@@ -39,12 +38,3 @@ def processes():
 def client(processes):
     """Тестовый клиент с уже запущенными процессами."""
     return TestClient(app)
-
-
-@pytest.fixture()
-def reset_mission():
-    """Сбросить глобальную миссию перед тестом."""
-    import src_solution.abu.app as app_mod
-    app_mod._mission = None
-    yield
-    app_mod._mission = None

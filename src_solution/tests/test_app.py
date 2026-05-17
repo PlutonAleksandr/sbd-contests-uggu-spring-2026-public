@@ -10,7 +10,7 @@ def test_health(client: TestClient) -> None:
     assert resp.json()["status"] == "ok"
 
 
-def test_mission_flow(client: TestClient, reset_mission) -> None:
+def test_mission_flow(client: TestClient) -> None:
     # Старт миссии
     resp = client.post("/api/v1/missions", json={
         "target_depth_m": 5.0,
@@ -47,7 +47,7 @@ def test_ai_suggest(client: TestClient) -> None:
     assert "suggested_feed_mm_rev" in data
 
 
-def test_rpm_env_cap(client: TestClient, reset_mission) -> None:
+def test_rpm_env_cap(client: TestClient) -> None:
     os.environ["ABU_MAX_RPM"] = "100"
     try:
         client.post("/api/v1/missions", json={"target_depth_m": 5.0})

@@ -3,8 +3,8 @@
 from fastapi.testclient import TestClient
 
 
-def test_e2e_dm_registers_rig_and_mission_reaches_abu(
-        client: TestClient) -> None:
+def test_e2e_dm_registers_rig_and_mission_reaches_abu(client: TestClient) -> None:
+    ...
     """Полный цикл: старт миссии, тики, завершение."""
     # 1. Старт миссии
     resp = client.post("/api/v1/missions", json={
