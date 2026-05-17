@@ -20,28 +20,26 @@ def enforce_rpm_cap(rpm: float, max_rpm: float) -> bool:
 
 
 def should_emergency_stop(
-    depth: float,
-    rpm: float,
-    pressure: float,
-    max_depth: float = 1000.0,
-    max_rpm: float = 500.0,
-    max_pressure: float = 100.0,
+    risk: str,
+    vib_samples: list[float],
+    vib_threshold: float = 0.9,
 ) -> bool:
     """
-    Аварийный стоп при превышении критических параметров.
+    Аварийный стоп при высоком риске или аномальной вибрации.
 
-    :param depth: текущая глубина
-    :param rpm: текущие обороты
-    :param pressure: текущее давление
-    :param max_depth: максимальная глубина
-    :param max_rpm: максимальные обороты
-    :param max_pressure: максимальное давление
+    :param risk: уровень риска ("high", "medium", "low")
+    :param vib_samples: последние замеры вибрации
+    :param vib_threshold: порог для определения аномальной вибрации
     :returns: True если нужна остановка
     """
-    if depth > max_depth:
+    # Проверка высокого риска
+    if risk == "high":
         return True
-    if rpm > max_rpm:
-        return True
-    if pressure > max_pressure:
-        return True
+    
+    # Проверка аномальной вибрации
+    if vib_samples and len(vib_samples) > 0:
+        # Простая проверка: если есть значения выше порога
+        if max(vib_samples) >= vib_threshold:
+            return True
+    
     return False
