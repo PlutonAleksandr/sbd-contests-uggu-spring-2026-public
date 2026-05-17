@@ -1,23 +1,68 @@
 {
-  "version": "1.0",
+  "default_action": "deny",
   "policies": [
     {
-      "source": "abu.app",
-      "target": "tcb.security_monitor",
-      "commands": ["authorize", "health", "events_ring", "events_full"],
-      "default": "deny"
+      "id": "POL-HEALTH-001",
+      "description": "Проверка здоровья всех компонентов разрешена для внутренних сервисов",
+      "source": "abu",
+      "target": ["security_monitor", "other_worker"],
+      "command": "health",
+      "action": "allow",
+      "payload_schema": {}
     },
     {
-      "source": "abu.app",
-      "target": "other.other_worker",
-      "commands": ["compute", "health"],
-      "default": "deny"
+      "id": "POL-AUTH-001",
+      "description": "Запрос на авторизацию команды от АБУ к Security Monitor",
+      "source": "abu",
+      "target": "security_monitor",
+      "command": "authorize",
+      "action": "allow",
+      "payload_constraints": {
+        "depth": { "type": "number", "minimum": 0, "maximum": 200 },
+        "rpm": { "type": "number", "minimum": 0, "maximum": 300 },
+        "pressure": { "type": "number", "minimum": 0, "maximum": 500 }
+      }
     },
     {
-      "source": "tcb.security_monitor",
-      "target": "other.other_worker",
-      "commands": [],
-      "default": "deny"
+      "id": "POL-COMPUTE-001",
+      "description": "Запрос на вычисления от АБУ к Other Worker",
+      "source": "abu",
+      "target": "other_worker",
+      "command": "compute",
+      "action": "allow",
+      "payload_constraints": {
+        "vibration_samples": { "type": "array", "maxItems": 100 },
+        "depth_m": { "type": "number", "minimum": 0, "maximum": 200 },
+        "torque_nm": { "type": "number", "minimum": 0 },
+        "pressure": { "type": "number", "minimum": 0 }
+      }
+    },
+    {
+      "id": "POL-EVENTS-001",
+      "description": "Запрос на получение кольцевого буфера событий",
+      "source": "abu",
+      "target": "security_monitor",
+      "command": "events_ring",
+      "action": "allow",
+      "payload_schema": {}
+    },
+    {
+      "id": "POL-EVENTS-002",
+      "description": "Запрос на получение полного журнала событий",
+      "source": "abu",
+      "target": "security_monitor",
+      "command": "events_full",
+      "action": "allow",
+      "payload_schema": {}
+    },
+    {
+      "id": "POL-SHUTDOWN-001",
+      "description": "Команда на завершение работы для всех компонентов",
+      "source": "abu",
+      "target": ["security_monitor", "other_worker"],
+      "command": "shutdown",
+      "action": "allow",
+      "payload_schema": {}
     }
   ]
 }

@@ -51,7 +51,8 @@ _mission: MissionState | None = None
 
 def _start_processes():
     """Запуск дочерних процессов (только если ещё не запущены)."""
-    nonlocal tcb_process, other_process
+    global tcb_process, other_process
+
     if tcb_process is not None and tcb_process.is_alive():
         return
     tcb_process = multiprocessing.Process(
@@ -70,7 +71,6 @@ def _start_processes():
 
 def _ensure_processes():
     """Запускает процессы, если ещё не запущены (отложенный старт)."""
-    nonlocal tcb_process, other_process
     if (tcb_process is None or not tcb_process.is_alive() or
             other_process is None or not other_process.is_alive()):
         _start_processes()
@@ -162,7 +162,6 @@ def status() -> dict[str, Any]:
 @app.post("/api/v1/missions")
 def start_mission(body: MissionIn) -> dict[str, Any]:
     """Принять новое задание."""
-    nonlocal _mission
     mid = str(uuid.uuid4())
     _mission = MissionState(
         mission_id=mid,
@@ -187,7 +186,6 @@ def current_mission() -> dict[str, Any]:
 @app.post("/api/v1/missions/tick")
 def tick_step() -> dict[str, Any]:
     """Один шаг симуляции."""
-    nonlocal _mission
     if _mission is None:
         raise HTTPException(status_code=400, detail="нет миссии")
     m = _mission
@@ -234,8 +232,8 @@ def tick_step() -> dict[str, Any]:
         m.status = "emergency"
         default_log.record(
             EventLevel.CRITICAL,
-            f"authorize_step denied: {
-                auth['reason']}")
+            f"authorize_step denied: {auth['reason']}"
+        )
     else:
         if m.depth_m >= m.target_depth_m:
             m.status = "completed"

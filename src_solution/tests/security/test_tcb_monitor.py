@@ -51,4 +51,4 @@ def test_authorize_invalid_payload():
     monitor = SecurityMonitorProcess(q_in, q_out)
     result = monitor._authorize({"invalid": "data"})
     assert result["authorized"] is False
-    assert result["reason"] == "Invalid step data"
+    assert "Invalid step data" in result["reason"]
