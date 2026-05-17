@@ -1,27 +1,93 @@
+# Решение АБУ (автономная буровая установка)
+
 ## Архитектура решения
 
-Решение состоит из двух изолированных доменов:
+Решение разделено на два изолированных домена, которые взаимодействуют исключительно через контролируемые интерфейсы:
 
-- **Доверенная вычислительная база (TCB)** – `src_solution/abu/tcb/`. Включает:
-  - `event_log.py` – журнал событий безопасности.
-  - `safety.py` – критические проверки глубины, RPM, аварийного останова.
-  - `sys/security_monitor.py` – монитор безопасности, единственная точка авторизации критических команд.
-  - `datatypes.py` – структуры данных, передаваемые между доменами.
-- **Недоверенный код (Other)** – `src_solution/abu/other/`. Включает:
-  - `numpy_workflow.py` – обработка телеметрии (numpy).
-  - `pseudo_ai.py` – эвристики риска и вибрации.
-  - `validation_worker.py` – предварительная валидация и подготовка данных.
-  - `other_worker.py` – процесс-обёртка для взаимодействия с TCB.
+### Доверенная вычислительная база (TCB) – `src_solution/abu/tcb/`
 
-Взаимодействие между доменами осуществляется только через `multiprocessing.Queue` под контролем `security_monitor`. Политики IPC определены в `tcb/sys/ipc_policies.json`.
+- **event_log.py** – отказоустойчивый журнал событий безопасности (кольцевой буфер + файл). Реализует цель SG_ADS_Security_events_store.
+- **safety.py** – критические проверки глубины (`enforce_depth_cap`), оборотов (`enforce_rpm_cap`) и аварийного останова (`should_emergency_stop`). Реализует SG_ADS_Controlled_operations.
+- **datatypes.py** – легковесная структура `SecureStep` для передачи подготовленных данных между доменами.
+- **sys/security_monitor.py** – монитор безопасности (`SecurityMonitorProcess`). Единственная точка авторизации критических команд бурения. Принимает подготовленный `SecureStep` через очередь, выполняет проверки и записывает события в журнал. Реализует SG_ADS_Authorized_critical_commands.
+- **sys/ipc_policies.json** – политики межпроцессного взаимодействия для доменов TCB.
+
+### Недоверенный код (Other) – `src_solution/abu/other/`
+
+- **numpy_workflow.py** – тяжелые вычисления (сглаживание вибрации) с использованием numpy.
+- **pseudo_ai.py** – эвристики оценки риска, аномалии вибрации и выбора режима бурения.
+- **validation_worker.py** – предварительная валидация сырых данных и приведение их к `SecureStep`.
+- **other_worker.py** – процесс-обёртка (`OtherWorkerProcess`), изолирующая все недоверенные вычисления.
+
+### Изоляция процессов
+
+Домены запускаются как независимые процессы ОС (модуль `multiprocessing.Process`).  
+Взаимодействие между ними осуществляется только через типизированные очереди `multiprocessing.Queue`.  
+Приложение FastAPI (`app.py`) выступает диспетчером и не содержит кода безопасности.  
+Все сообщения проходят по разрешённым маршрутам, описанным в политиках IPC.
+
+## Цели безопасности
+
+| Идентификатор | Формулировка | Реализация |
+|---------------|--------------|------------|
+| SG_ADS_Authorized_critical_commands | При любых обстоятельствах выполняются только авторизованные критические команды. | `authorize_step` в `security_monitor.py` – единственный вход для критических операций. |
+| SG_ADS_Controlled_operations | При любых обстоятельствах соблюдаются критические ограничения (глубина, RPM, аварийный стоп). | Модуль `safety.py` с функциями `enforce_depth_cap`, `enforce_rpm_cap`, `should_emergency_stop`. Вызываются только из ДВБ. |
+| SG_ADS_Security_events_store | При любых обстоятельствах сохраняются события безопасности. | Модуль `event_log.py` – потокобезопасная запись в кольцевой буфер и файл. |
+
+## Предположения безопасности
+
+| Идентификатор | Формулировка |
+|---------------|--------------|
+| SA_ADS_Trustrworthy_authorized_operators | Авторизованные сотрудники Цифрового Рудника являются благонадёжными. |
+| SA_ADS_Separated_other | Недоверенные модули (`numpy`, псевдо-ИИ) не могут нарушить работу ДВБ при соблюдении процессной изоляции. |
+| SA_ADS_TCB_minimal | Доверенная база содержит минимум кода и не зависит от внешних библиотек (requirements.txt пуст). |
 
 ## Тесты безопасности
 
-| Цель безопасности | Идентификатор | Тесты (пути к файлам) | Комментарий |
-|-------------------|---------------|------------------------|-------------|
-| Авторизованные критичные команды | SG_ADS_Authorized_critical_commands | `src_solution/tests/security/test_sg_authorized_commands.py` | Проверка authorize_step |
-| Контролируемые операции | SG_ADS_Controlled_operations | `src_solution/tests/security/test_sg_controlled_ops.py` | Глубина, RPM, emergency |
-| Сохранение событий безопасности | SG_ADS_Security_events_store | `src_solution/tests/security/test_sg_security_events.py` | Журнал событий |
-| Покрытие ДВБ (SecurityMonitor) | SG_ADS_Authorized_critical_commands, SG_ADS_Controlled_operations | `src_solution/tests/security/test_tcb_monitor.py` | Прямые тесты монитора |
+Все тесты находятся в подкаталогах `src_solution/tests` и используют маркер `pytest.mark.security`.
 
-Все тесты используют маркер `pytest.mark.security`.
+| Цель безопасности | Тестовые файлы | Описание |
+|-------------------|----------------|----------|
+| SG_ADS_Authorized_critical_commands | `tests/security/test_sg_authorized_commands.py` | Проверка авторизации шага через API |
+| SG_ADS_Authorized_critical_commands | `tests/security/test_tcb_monitor.py` | Модульные тесты `SecurityMonitorProcess._authorize` (валидный шаг, аварийный стоп, неверные данные) |
+| SG_ADS_Controlled_operations | `tests/security/test_sg_controlled_ops.py` | Тесты `should_emergency_stop` и `risk_flag` |
+| SG_ADS_Security_events_store | `tests/security/test_sg_security_events.py` | Проверка записи в кольцевой буфер и полный журнал |
+| Сквозной сценарий ЦР–АБУ | `tests/test_e2e_abu_dm_scenario.py` | Полный цикл: старт миссии → тики → завершение/аварийный стоп → проверка журнала |
+
+## Политики IPC
+
+Файлы политик:
+- `src_solution/abu/tcb/sys/ipc_policies.json`
+- `src_solution/abu/policies/ipc_policies.json`
+
+Разрешённые взаимодействия:
+- `abu.app` → `tcb.security_monitor`: команды `authorize`, `health`, `events_ring`, `events_full`
+- `abu.app` → `other.other_worker`: команды `compute`, `health`
+- Все остальные соединения запрещены (default: deny).
+
+Политики гарантируют, что ДВБ не может быть скомпрометирован через недоверенный домен.
+
+## Зависимости и SBOM
+
+- **requirements.txt** – пустой (TCB не имеет зависимостей).
+- **requirements-other.txt** – содержит `fastapi`, `uvicorn`, `pydantic`, `httpx`, `numpy` (все они используются только в недоверенном коде или в точке входа, которая не относится к ДВБ).
+- **SBOM_TCB.cdx.json** – не содержит `numpy`, только компонент `abu-controller`.
+- **SBOM_OTHER.cdx.json** – содержит все необходимые библиотеки, включая `numpy`.
+
+## Сертификация
+
+Процесс сертификации (`make certify-abu-solution`) формирует пакет из файлов `src_solution`, проверяет структуру ДВБ, изоляцию, политики, SBOM и запускает тесты безопасности.
+
+Текущая стоимость сертификации по модели: ~1800 условных единиц (при полном прохождении тестов снижается ниже 1000).  
+Основные факторы снижения стоимости:
+- Минимальный размер ДВБ (<100 строк кода в самом крупном файле `security_monitor`).
+- Отсутствие внешних зависимостей в TCB.
+- Процессная изоляция с контролем IPC.
+- Наличие монитора безопасности и политик.
+
+## Инструкции по воспроизводимости
+
+1. Клонировать репозиторий.
+2. Установить зависимости:
+   ```bash
+   pip install -r src_solution/requirements-other.txt

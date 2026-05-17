@@ -1,7 +1,6 @@
 """Тесты основного API."""
 
 import os
-import pytest
 from fastapi.testclient import TestClient
 
 
@@ -30,7 +29,11 @@ def test_mission_flow(client: TestClient) -> None:
             break
     else:
         mission = data.get("mission", {})
-    assert mission.get("status") in ("completed", "emergency", "stopped_depth", "stopped_rpm")
+    assert mission.get("status") in (
+        "completed",
+        "emergency",
+        "stopped_depth",
+        "stopped_rpm")
 
 
 def test_ai_suggest(client: TestClient) -> None:

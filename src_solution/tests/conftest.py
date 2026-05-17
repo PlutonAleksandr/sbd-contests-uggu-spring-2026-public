@@ -5,6 +5,7 @@ from src_solution.abu.app import app, tcb_request_queue, tcb_response_queue, oth
 from src_solution.abu.tcb.sys.security_monitor import SecurityMonitorProcess
 from src_solution.abu.other.other_worker import OtherWorkerProcess
 
+
 @pytest.fixture(scope="session")
 def processes():
     """Запуск дочерних процессов на всё время сессии."""
@@ -27,10 +28,12 @@ def processes():
     tcb.join(timeout=2)
     other.join(timeout=2)
 
+
 @pytest.fixture()
 def client(processes):
     """Тестовый клиент с уже запущенными процессами."""
     return TestClient(app)
+
 
 @pytest.fixture(autouse=True)
 def reset_mission():

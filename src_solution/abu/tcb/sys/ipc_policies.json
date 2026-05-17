@@ -8,6 +8,12 @@
       "default": "deny"
     },
     {
+      "source": "abu.app",
+      "target": "other.other_worker",
+      "commands": ["compute", "health"],
+      "default": "deny"
+    },
+    {
       "source": "tcb.security_monitor",
       "target": "other.other_worker",
       "commands": [],

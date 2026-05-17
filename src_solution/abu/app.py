@@ -51,7 +51,7 @@ _mission: MissionState | None = None
 
 def _start_processes():
     """Запуск дочерних процессов (только если ещё не запущены)."""
-    global tcb_process, other_process
+    nonlocal tcb_process, other_process
     if tcb_process is not None and tcb_process.is_alive():
         return
     tcb_process = multiprocessing.Process(
@@ -68,14 +68,25 @@ def _start_processes():
     other_process.start()
 
 
+def _ensure_processes():
+    """Запускает процессы, если ещё не запущены (отложенный старт)."""
+    nonlocal tcb_process, other_process
+    if (tcb_process is None or not tcb_process.is_alive() or
+            other_process is None or not other_process.is_alive()):
+        _start_processes()
+        # Даём процессам время на инициализацию
+        import time
+        time.sleep(0.2)
+
+
 def _send_tcb(command: str, payload: dict = None) -> dict:
-    """Отправить запрос в TCB через IPC."""
+    _ensure_processes()
     tcb_request_queue.put({"command": command, "payload": payload or {}})
     return tcb_response_queue.get(timeout=5.0)
 
 
 def _send_other(command: str, payload: dict = None) -> dict:
-    """Отправить запрос в Other через IPC."""
+    _ensure_processes()
     other_request_queue.put({"command": command, "payload": payload or {}})
     return other_response_queue.get(timeout=5.0)
 
@@ -151,7 +162,7 @@ def status() -> dict[str, Any]:
 @app.post("/api/v1/missions")
 def start_mission(body: MissionIn) -> dict[str, Any]:
     """Принять новое задание."""
-    global _mission
+    nonlocal _mission
     mid = str(uuid.uuid4())
     _mission = MissionState(
         mission_id=mid,
@@ -176,7 +187,7 @@ def current_mission() -> dict[str, Any]:
 @app.post("/api/v1/missions/tick")
 def tick_step() -> dict[str, Any]:
     """Один шаг симуляции."""
-    global _mission
+    nonlocal _mission
     if _mission is None:
         raise HTTPException(status_code=400, detail="нет миссии")
     m = _mission
