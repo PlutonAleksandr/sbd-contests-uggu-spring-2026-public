@@ -11,19 +11,7 @@
     {
       "source": "abu.app",
       "target": "other.other_worker",
-      "commands": ["validate", "compute", "health"],
-      "default": "deny"
-    },
-    {
-      "source": "tcb.security_monitor",
-      "target": "other.other_worker",
-      "commands": [],
-      "default": "deny"
-    },
-    {
-      "source": "other.other_worker",
-      "target": "tcb.security_monitor",
-      "commands": [],
+      "commands": ["compute", "health"],
       "default": "deny"
     }
   ]
