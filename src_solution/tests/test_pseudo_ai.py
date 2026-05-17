@@ -2,7 +2,7 @@
 
 import pytest
 
-from abu.pseudo_ai import anomaly_vibration, regime_suggest, risk_flag
+from abu.other.pseudo_ai import anomaly_vibration, regime_suggest, risk_flag
 
 
 def test_anomaly_single_sample() -> None:
